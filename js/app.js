@@ -118,6 +118,9 @@ function showPage(pageName) {
             case 'users':
                 loadUsersData();
                 break;
+            case 'reports':
+                loadReportsPage();
+                break;
         }
     }
 }
@@ -1746,6 +1749,410 @@ async function toggleUserStatus(userId, newStatus) {
     } catch (error) {
         console.error('Error updating user status:', error);
         alert('Error updating user status. Please try again.');
+    }
+}
+
+// ==================== REPORT FUNCTIONS ====================
+
+// Load reports page
+async function loadReportsPage() {
+    const reportsContainer = document.getElementById('reports-content');
+    if (!reportsContainer) return;
+    
+    // Set default date range (last 7 days)
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+    
+    // Set date inputs
+    document.getElementById('report-start-date').valueAsDate = startDate;
+    document.getElementById('report-end-date').valueAsDate = endDate;
+    
+    // Load report for default date range
+    await generateSalesReport(startDate, endDate);
+}
+
+// Generate sales report
+async function generateSalesReport(startDate, endDate) {
+    const reportContainer = document.getElementById('report-results');
+    reportContainer.innerHTML = '<p class="loading-message">Generating report...</p>';
+    
+    try {
+        // Adjust dates for full day coverage
+        const startOfDay = new Date(startDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        // Query sales within date range
+        const salesQuery = query(
+            collection(db, 'sales'),
+            where('saleDate', '>=', startOfDay),
+            where('saleDate', '<=', endOfDay),
+            orderBy('saleDate', 'desc')
+        );
+        
+        const salesSnapshot = await getDocs(salesQuery);
+        const sales = salesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        if (sales.length === 0) {
+            reportContainer.innerHTML = '<p class="empty-state">No sales found for the selected period</p>';
+            return;
+        }
+        
+        // Calculate summary statistics
+        const summary = calculateSalesSummary(sales);
+        
+        // Group sales by date
+        const salesByDate = groupSalesByDate(sales);
+        
+        // Group sales by payment method
+        const salesByPayment = groupSalesByPaymentMethod(sales);
+        
+        // Get top selling items
+        const topItems = getTopSellingItems(sales);
+        
+        // Build report HTML
+        let reportHTML = `
+            <!-- Summary Cards -->
+            <div class="report-summary">
+                <div class="summary-grid">
+                    <div class="summary-stat">
+                        <h4>Total Sales</h4>
+                        <p class="stat-value">₦${summary.totalRevenue.toLocaleString()}</p>
+                    </div>
+                    <div class="summary-stat">
+                        <h4>Transactions</h4>
+                        <p class="stat-value">${summary.totalTransactions}</p>
+                    </div>
+                    <div class="summary-stat">
+                        <h4>Average Sale</h4>
+                        <p class="stat-value">₦${summary.averageSale.toLocaleString()}</p>
+                    </div>
+                    <div class="summary-stat">
+                        <h4>Credit Sales</h4>
+                        <p class="stat-value">₦${summary.creditSales.toLocaleString()}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Daily Breakdown -->
+            <div class="report-section">
+                <h3>Daily Sales Breakdown</h3>
+                <div class="daily-sales-table">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Transactions</th>
+                                <th>Total Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
+        // Add daily sales rows
+        Object.keys(salesByDate).sort().reverse().forEach(date => {
+            const dayData = salesByDate[date];
+            reportHTML += `
+                <tr>
+                    <td>${formatDateForReport(date)}</td>
+                    <td>${dayData.count}</td>
+                    <td>₦${dayData.total.toLocaleString()}</td>
+                </tr>
+            `;
+        });
+        
+        reportHTML += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Payment Methods Breakdown -->
+            <div class="report-section">
+                <h3>Payment Methods</h3>
+                <div class="payment-breakdown">
+        `;
+        
+        Object.keys(salesByPayment).forEach(method => {
+            const methodData = salesByPayment[method];
+            const percentage = ((methodData.total / summary.totalRevenue) * 100).toFixed(1);
+            reportHTML += `
+                <div class="payment-method-stat">
+                    <div class="method-info">
+                        <span class="method-name">${method.toUpperCase()}</span>
+                        <span class="method-count">${methodData.count} transactions</span>
+                    </div>
+                    <div class="method-amount">
+                        <span>₦${methodData.total.toLocaleString()}</span>
+                        <span class="percentage">(${percentage}%)</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        reportHTML += `
+                </div>
+            </div>
+            
+            <!-- Top Selling Items -->
+            <div class="report-section">
+                <h3>Top 10 Selling Items</h3>
+                <div class="top-items-table">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Quantity Sold</th>
+                                <th>Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
+        // Add top items rows
+        topItems.slice(0, 10).forEach(item => {
+            reportHTML += `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.quantity}</td>
+                    <td>₦${item.revenue.toLocaleString()}</td>
+                </tr>
+            `;
+        });
+        
+        reportHTML += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Export Button -->
+            <div class="report-actions">
+                <button id="export-report-btn" class="btn-primary">
+                    Export to CSV
+                </button>
+            </div>
+        `;
+        
+        reportContainer.innerHTML = reportHTML;
+        
+        // Add export button listener
+        document.getElementById('export-report-btn').addEventListener('click', () => {
+            exportSalesToCSV(sales, startDate, endDate);
+        });
+        
+    } catch (error) {
+        console.error('Error generating report:', error);
+        reportContainer.innerHTML = '<p class="error-message">Error generating report. Please try again.</p>';
+    }
+}
+
+// Calculate sales summary
+function calculateSalesSummary(sales) {
+    const summary = {
+        totalRevenue: 0,
+        totalTransactions: sales.length,
+        creditSales: 0,
+        cashSales: 0,
+        posSales: 0,
+        transferSales: 0,
+        averageSale: 0
+    };
+    
+    sales.forEach(sale => {
+        summary.totalRevenue += sale.totalAmount || 0;
+        
+        switch(sale.paymentMethod) {
+            case 'credit':
+                summary.creditSales += sale.totalAmount || 0;
+                break;
+            case 'cash':
+                summary.cashSales += sale.totalAmount || 0;
+                break;
+            case 'pos':
+                summary.posSales += sale.totalAmount || 0;
+                break;
+            case 'transfer':
+                summary.transferSales += sale.totalAmount || 0;
+                break;
+        }
+    });
+    
+    summary.averageSale = summary.totalTransactions > 0 
+        ? Math.round(summary.totalRevenue / summary.totalTransactions) 
+        : 0;
+    
+    return summary;
+}
+
+// Group sales by date
+function groupSalesByDate(sales) {
+    const grouped = {};
+    
+    sales.forEach(sale => {
+        const date = sale.saleDate.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate);
+        const dateKey = date.toISOString().split('T')[0];
+        
+        if (!grouped[dateKey]) {
+            grouped[dateKey] = {
+                count: 0,
+                total: 0,
+                sales: []
+            };
+        }
+        
+        grouped[dateKey].count++;
+        grouped[dateKey].total += sale.totalAmount || 0;
+        grouped[dateKey].sales.push(sale);
+    });
+    
+    return grouped;
+}
+
+// Group sales by payment method
+function groupSalesByPaymentMethod(sales) {
+    const grouped = {};
+    
+    sales.forEach(sale => {
+        const method = sale.paymentMethod || 'cash';
+        
+        if (!grouped[method]) {
+            grouped[method] = {
+                count: 0,
+                total: 0
+            };
+        }
+        
+        grouped[method].count++;
+        grouped[method].total += sale.totalAmount || 0;
+    });
+    
+    return grouped;
+}
+
+// Get top selling items
+function getTopSellingItems(sales) {
+    const itemStats = {};
+    
+    sales.forEach(sale => {
+        const itemName = sale.itemName;
+        if (!itemName) return;
+        
+        if (!itemStats[itemName]) {
+            itemStats[itemName] = {
+                name: itemName,
+                quantity: 0,
+                revenue: 0
+            };
+        }
+        
+        itemStats[itemName].quantity += sale.quantity || 0;
+        itemStats[itemName].revenue += sale.totalAmount || 0;
+    });
+    
+    // Convert to array and sort by revenue
+    return Object.values(itemStats).sort((a, b) => b.revenue - a.revenue);
+}
+
+// Format date for report display
+function formatDateForReport(dateString) {
+    const date = new Date(dateString);
+    const options = { 
+        weekday: 'short', 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+    };
+    return date.toLocaleDateString('en-GB', options);
+}
+
+// Export sales to CSV
+function exportSalesToCSV(sales, startDate, endDate) {
+    // Prepare CSV headers
+    const headers = [
+        'Date',
+        'Time',
+        'Item',
+        'Quantity',
+        'Unit Price',
+        'Total Amount',
+        'Payment Method',
+        'Customer Name',
+        'Remarks',
+        'Recorded By'
+    ];
+    
+    // Prepare CSV rows
+    const rows = sales.map(sale => {
+        const date = sale.saleDate.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate);
+        return [
+            date.toLocaleDateString('en-GB'),
+            date.toLocaleTimeString('en-GB'),
+            sale.itemName || '',
+            sale.quantity || 0,
+            sale.unitPrice || 0,
+            sale.totalAmount || 0,
+            sale.paymentMethod || 'cash',
+            sale.customerName || '',
+            sale.remarks || '',
+            sale.recordedBy || ''
+        ];
+    });
+    
+    // Create CSV content
+    let csvContent = headers.join(',') + '\n';
+    rows.forEach(row => {
+        csvContent += row.map(cell => {
+            // Escape commas and quotes in cell content
+            const cellStr = String(cell);
+            if (cellStr.includes(',') || cellStr.includes('"')) {
+                return `"${cellStr.replace(/"/g, '""')}"`;
+            }
+            return cellStr;
+        }).join(',') + '\n';
+    });
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+    const filename = `sales_report_${startStr}_to_${endStr}.csv`;
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    alert(`Report exported successfully as ${filename}`);
+}
+
+// Setup report event listeners (call this from setupEventListeners)
+function setupReportEventListeners() {
+    const generateBtn = document.getElementById('generate-report-btn');
+    const startDateInput = document.getElementById('report-start-date');
+    const endDateInput = document.getElementById('report-end-date');
+    
+    if (generateBtn) {
+        generateBtn.addEventListener('click', () => {
+            const startDate = new Date(startDateInput.value);
+            const endDate = new Date(endDateInput.value);
+            
+            if (startDate > endDate) {
+                alert('Start date cannot be after end date');
+                return;
+            }
+            
+            generateSalesReport(startDate, endDate);
+        });
     }
 }
 

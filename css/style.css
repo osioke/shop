@@ -1426,3 +1426,262 @@ body.role-manager .nav-btn.manager-only {
         font-size: 1.1rem;
     }
 }
+
+/* ==================== SALES REPORTS STYLES ==================== */
+
+/* Report Controls */
+.report-controls {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+}
+
+.date-range-selector {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.date-input-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.date-input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.date-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+#generate-report-btn {
+    min-width: 150px;
+    padding: 0.75rem 1.5rem;
+}
+
+/* Report Results */
+.report-results {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    min-height: 400px;
+}
+
+/* Report Summary */
+.report-summary {
+    margin-bottom: 2rem;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.summary-stat {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.summary-stat h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summary-stat .stat-value {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Report Sections */
+.report-section {
+    margin-bottom: 2rem;
+    padding-top: 1rem;
+    border-top: 2px solid #f1f3f4;
+}
+
+.report-section:first-child {
+    border-top: none;
+    padding-top: 0;
+}
+
+.report-section h3 {
+    margin-bottom: 1rem;
+    color: #333;
+    font-size: 1.2rem;
+}
+
+/* Report Table */
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.report-table thead {
+    background: #f8f9fa;
+}
+
+.report-table th {
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #e1e5e9;
+}
+
+.report-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.report-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.report-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Payment Breakdown */
+.payment-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.payment-method-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: background 0.2s ease;
+}
+
+.payment-method-stat:hover {
+    background: #e9ecef;
+}
+
+.method-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.method-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.method-count {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.method-amount {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.method-amount span:first-child {
+    font-weight: 600;
+    color: #667eea;
+}
+
+.percentage {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* Report Actions */
+.report-actions {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid #f1f3f4;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+#export-report-btn {
+    min-width: 200px;
+}
+
+/* Responsive Design for Reports */
+@media (max-width: 768px) {
+    .date-range-selector {
+        flex-direction: column;
+    }
+    
+    .date-input-group {
+        width: 100%;
+    }
+    
+    #generate-report-btn {
+        width: 100%;
+    }
+    
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .report-table {
+        font-size: 0.9rem;
+    }
+    
+    .report-table th,
+    .report-table td {
+        padding: 0.5rem;
+    }
+    
+    .payment-method-stat {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .report-results {
+        padding: 1rem;
+    }
+    
+    .summary-stat {
+        padding: 1rem;
+    }
+    
+    .summary-stat .stat-value {
+        font-size: 1.5rem;
+    }
+    
+    .report-table {
+        font-size: 0.85rem;
+    }
+}

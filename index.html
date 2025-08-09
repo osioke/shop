@@ -89,6 +89,10 @@
                 <span class="nav-icon">👥</span>
                 Users
             </button>
+            <button id="nav-reports" class="nav-btn admin-only manager-only" data-page="reports">
+                <span class="nav-icon">📈</span>
+                Reports
+            </button>
         </nav>
 
         <!-- Page Content -->
@@ -263,6 +267,35 @@
 
                 <div id="users-list" class="users-list">
                     <p class="empty-state">Loading users...</p>
+                </div>
+            </div>
+
+            <!-- Reports Page -->
+            <div id="page-reports" class="page">
+                <div class="page-header">
+                    <h2>Sales Reports</h2>
+                    <p>View and export sales data</p>
+                </div>
+
+                <div class="report-controls">
+                    <div class="date-range-selector">
+                        <div class="date-input-group">
+                            <label for="report-start-date">From Date</label>
+                            <input type="date" id="report-start-date" class="date-input">
+                        </div>
+                        <div class="date-input-group">
+                            <label for="report-end-date">To Date</label>
+                            <input type="date" id="report-end-date" class="date-input">
+                        </div>
+                        <button id="generate-report-btn" class="btn-primary">
+                            Generate Report
+                        </button>
+                    </div>
+                </div>
+
+                <div id="report-results" class="report-results">
+                    <!-- Report will be generated here -->
+                    <p class="empty-state">Select a date range and click "Generate Report" to view sales data</p>
                 </div>
             </div>
         </main>
