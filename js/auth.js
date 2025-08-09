@@ -25,9 +25,11 @@ const userNameSpan = document.getElementById('user-name');
 const userRoleSpan = document.getElementById('user-role');
 const forgotPasswordLink = document.getElementById('forgot-password');
 
-// Current user state
-let currentUser = null;
-let userRole = null;
+// Create a state object that can be properly exported and updated
+const authState = {
+    currentUser: null,
+    userRole: null
+};
 
 // Initialize authentication
 export function initAuth() {
@@ -104,7 +106,8 @@ async function handleLogin(e) {
 // Handle user logged in
 async function handleUserLoggedIn(user) {
     try {
-        currentUser = user;
+        // Update the auth state
+        authState.currentUser = user;
 
         // Get user data from Firestore
         const userDoc = await getDoc(doc(db, 'users', user.uid));
@@ -126,7 +129,14 @@ async function handleUserLoggedIn(user) {
             return;
         }
 
-        userRole = userData.role;
+        // Update the auth state with the role
+        authState.userRole = userData.role;
+        
+        // Also make it globally available for debugging
+        window.currentUser = authState.currentUser;
+        window.userRole = authState.userRole;
+        
+        console.log('User logged in with role:', authState.userRole);
 
         // Update last login time
         try {
@@ -139,7 +149,7 @@ async function handleUserLoggedIn(user) {
 
         // Update UI
         updateUserDisplay(userData);
-        setRoleBasedUI(userRole);
+        setRoleBasedUI(authState.userRole);
 
         // Show app, hide login
         hideLogin();
@@ -159,8 +169,13 @@ async function handleUserLoggedIn(user) {
 
 // Handle user logged out
 function handleUserLoggedOut() {
-    currentUser = null;
-    userRole = null;
+    // Clear the auth state
+    authState.currentUser = null;
+    authState.userRole = null;
+    
+    // Clear global references
+    window.currentUser = null;
+    window.userRole = null;
 
     // Reset UI
     clearUserDisplay();
@@ -230,11 +245,31 @@ function clearUserDisplay() {
 
 // Set role-based UI
 function setRoleBasedUI(role) {
+    console.log('Setting role-based UI for role:', role);
+    
     // Remove all role classes
     document.body.classList.remove('role-admin', 'role-manager', 'role-entry-only');
 
     // Add current role class
     document.body.classList.add(`role-${role}`);
+    
+    // Force reflow to ensure CSS updates
+    document.body.offsetHeight;
+    
+    // Log which navigation items should be visible
+    const adminNavItems = document.querySelectorAll('.nav-btn.admin-only');
+    const managerNavItems = document.querySelectorAll('.nav-btn.manager-only');
+    
+    console.log('Admin nav items found:', adminNavItems.length);
+    console.log('Manager nav items found:', managerNavItems.length);
+    
+    if (role === 'admin') {
+        console.log('Admin role: All navigation items should be visible');
+    } else if (role === 'manager') {
+        console.log('Manager role: Manager navigation items should be visible');
+    } else {
+        console.log('Entry-only role: Only basic navigation items should be visible');
+    }
 }
 
 // Clear role-based UI
@@ -287,8 +322,15 @@ function hideLoginError() {
     loginError.classList.add('hidden');
 }
 
-// Export functions for use in other modules
-export { currentUser, userRole };
+// Export the auth state object and getter functions
+export const getAuthState = () => authState;
+export const getCurrentUser = () => authState.currentUser;
+export const getUserRole = () => authState.userRole;
+
+// For backward compatibility, also export the values directly
+// Note: These won't update after initial import, use the getter functions instead
+export let currentUser = authState.currentUser;
+export let userRole = authState.userRole;
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {

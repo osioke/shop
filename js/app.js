@@ -1,6 +1,7 @@
 // Main application logic
 import { db } from './firebase-config.js';
-import { currentUser, userRole } from './auth.js';
+// Import the getter functions instead of the variables directly
+import { getCurrentUser, getUserRole, getAuthState } from './auth.js';
 import { 
     collection, 
     doc, 
@@ -57,6 +58,13 @@ let selectedPaymentMethod = 'cash';
 
 // Initialize app (called from auth.js when user is authenticated)
 window.initializeApp = function() {
+    console.log('Initializing app...');
+    
+    // Get current auth state
+    const authState = getAuthState();
+    console.log('Current auth state:', authState);
+    console.log('User role in app:', getUserRole());
+    
     setupNavigation();
     setupEventListeners();
     loadDashboardData();
@@ -64,7 +72,18 @@ window.initializeApp = function() {
     
     // Start listening for real-time updates
     startRealtimeListeners();
+    
+    // Setup report event listeners
+    setupReportEventListeners();
 };
+
+// Helper function to get current user and role
+function getCurrentAuthInfo() {
+    return {
+        user: getCurrentUser(),
+        role: getUserRole()
+    };
+}
 
 // Setup navigation
 function setupNavigation() {
@@ -266,6 +285,9 @@ function updateTotal() {
 // Handle sale submission
 async function handleSaleSubmit(e) {
     e.preventDefault();
+
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
     
     const itemName = itemSearchInput.value.trim();
     const quantity = parseInt(quantityInput.value);
@@ -410,6 +432,10 @@ async function handleSaleSubmit(e) {
 
 // Update credits for customer
 async function updateCreditsForCustomer(customerName, amount) {
+
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
     try {
         // Check if customer already has credits
         const creditsQuery = query(
@@ -462,6 +488,10 @@ async function updateCreditsForCustomer(customerName, amount) {
 
 // Log user activity
 async function logActivity(action, details) {
+
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
     try {
         await addDoc(collection(db, 'user_activity'), {
             userId: currentUser.uid,
@@ -500,8 +530,10 @@ async function loadDashboardData() {
         todaySalesEl.textContent = `₦${totalSales.toLocaleString()}`;
         todayTransactionsEl.textContent = `${totalTransactions} transactions`;
         
+        const currentRole = getUserRole();
+
         // Load credits summary (admin/manager only)
-        if (userRole === 'admin' || userRole === 'manager') {
+        if (currentRole === 'admin' || currentRole === 'manager') {
             await loadCreditsSummary();
             await loadItemsCount();
         }
@@ -914,6 +946,11 @@ function setupModalPaymentButtons() {
 
 // Record payment
 async function recordPayment(creditId) {
+
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
+
     const amount = parseFloat(document.getElementById('payment-amount').value);
     const remarks = document.getElementById('payment-remarks').value.trim();
     const activeMethodBtn = document.querySelector('.payment-method-btn.active');
@@ -1245,6 +1282,11 @@ function showAddItemModal() {
 
 // Handle add item
 async function handleAddItem() {
+
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
+
     const name = document.getElementById('new-item-name').value.trim();
     const price = parseFloat(document.getElementById('new-item-price').value);
     const category = document.getElementById('new-item-category').value.trim();
@@ -1364,6 +1406,11 @@ async function showEditItemModal(itemId) {
 
 // Handle edit item
 async function handleEditItem(itemId) {
+
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
+
     const name = document.getElementById('edit-item-name').value.trim();
     const price = parseFloat(document.getElementById('edit-item-price').value);
     const category = document.getElementById('edit-item-category').value.trim();
@@ -1405,6 +1452,10 @@ async function handleEditItem(itemId) {
 
 // Handle delete item
 async function handleDeleteItem(itemId) {
+
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
     if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
         return;
     }
@@ -1494,6 +1545,10 @@ async function loadUsersData() {
 
 // Generate HTML for user row
 function generateUserRowHTML(user) {
+
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
     const lastLogin = user.lastLogin ? formatDateTime(user.lastLogin) : 'Never';
     const statusClass = user.isActive ? 'active' : 'inactive';
     const statusText = user.isActive ? 'Active' : 'Inactive';
@@ -1589,6 +1644,9 @@ function showAddUserModal() {
 
 // Handle add user
 async function handleAddUser() {
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
     const email = document.getElementById('new-user-email').value.trim();
     const displayName = document.getElementById('new-user-name').value.trim();
     const password = document.getElementById('new-user-password').value;
@@ -1633,6 +1691,9 @@ async function handleAddUser() {
 
 // Show edit user modal
 async function showEditUserModal(userId) {
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
     try {
         const userDoc = await getDoc(doc(db, 'users', userId));
         if (!userDoc.exists()) {
@@ -1689,6 +1750,9 @@ async function showEditUserModal(userId) {
 
 // Handle edit user
 async function handleEditUser(userId) {
+    const currentUser = getCurrentUser(); // Get current user
+    const userRole = getUserRole(); // Get user role
+
     const displayName = document.getElementById('edit-user-name').value.trim();
     const role = document.getElementById('edit-user-role').value;
     

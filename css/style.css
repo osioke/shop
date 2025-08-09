@@ -1230,29 +1230,70 @@ body {
     opacity: 0.7;
 }
 
-/* Role-based visibility */
-.admin-only, .manager-only, .entry-only {
-    display: none;
+/* Add this section to your style.css file, replacing the existing role-based visibility section */
+
+/* ==================== ROLE-BASED VISIBILITY ==================== */
+
+/* Default: Hide all role-specific elements */
+.admin-only, 
+.manager-only, 
+.entry-only {
+    display: none !important;
 }
 
-body.role-admin .admin-only,
+/* Navigation role visibility - more specific selectors */
+.nav-btn.admin-only,
+.nav-btn.manager-only {
+    display: none !important;
+}
+
+/* Admin role: Show admin and manager elements */
+body.role-admin .admin-only {
+    display: block !important;
+}
+
 body.role-admin .manager-only {
-    display: block;
+    display: block !important;
 }
 
-body.role-manager .manager-only {
-    display: block;
-}
-
-body.role-entry-only .entry-only {
-    display: block;
-}
-
-/* Navigation role visibility */
+/* Admin navigation specific */
 body.role-admin .nav-btn.admin-only,
-body.role-admin .nav-btn.manager-only,
+body.role-admin .nav-btn.manager-only {
+    display: flex !important;
+}
+
+/* Manager role: Show manager elements only */
+body.role-manager .manager-only {
+    display: block !important;
+}
+
+/* Manager navigation specific */
 body.role-manager .nav-btn.manager-only {
-    display: flex;
+    display: flex !important;
+}
+
+/* Entry-only role: Show entry-only elements */
+body.role-entry-only .entry-only {
+    display: block !important;
+}
+
+/* Entry-only navigation specific */
+body.role-entry-only .nav-btn.entry-only {
+    display: flex !important;
+}
+
+/* Ensure stats cards follow the same pattern */
+body.role-admin .stat-card.admin-only,
+body.role-admin .stat-card.manager-only,
+body.role-manager .stat-card.manager-only {
+    display: block !important;
+}
+
+/* Quick action buttons visibility */
+body.role-admin .action-btn.admin-only,
+body.role-admin .action-btn.manager-only,
+body.role-manager .action-btn.manager-only {
+    display: block !important;
 }
 
 /* Responsive Design */
