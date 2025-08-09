@@ -546,14 +546,19 @@ async function loadDashboardData() {
 // Load credits summary
 async function loadCreditsSummary() {
     try {
+        // Simplified query to avoid index requirement
+        // First get all active credits, then filter in JavaScript
         const creditsQuery = query(
             collection(db, 'credits'),
-            where('isActive', '==', true),
-            where('totalOwed', '>', 0)
+            where('isActive', '==', true)
         );
         
         const creditsSnapshot = await getDocs(creditsQuery);
-        const activeCredits = creditsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Filter for credits with totalOwed > 0 in JavaScript
+        const activeCredits = creditsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(credit => credit.totalOwed > 0);
         
         const totalCredits = activeCredits.reduce((sum, credit) => sum + credit.totalOwed, 0);
         const creditCustomers = activeCredits.length;
@@ -563,6 +568,9 @@ async function loadCreditsSummary() {
         
     } catch (error) {
         console.error('Error loading credits summary:', error);
+        // Set default values if error occurs
+        totalCreditsEl.textContent = '₦0';
+        creditCustomersEl.textContent = '0 customers';
     }
 }
 
