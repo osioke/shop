@@ -328,6 +328,18 @@ async function handleSaleSubmit(e) {
         if (existingItem) {
             itemId = existingItem.id;
             
+            // CHECK STOCK AVAILABILITY
+            const currentStock = existingItem.quantity || 0;
+            if (currentStock < quantity) {
+                const proceed = confirm(
+                    `⚠️ Stock Warning!\n\n` +
+                    `Available stock: ${currentStock} units\n` +
+                    `You're trying to sell: ${quantity} units\n\n` +
+                    `This will result in negative stock. Continue anyway?`
+                );
+                if (!proceed) return;
+            }
+            
             // Update price if different (admin/manager only)
             if (existingItem.currentPrice !== unitPrice && 
                 (userRole === 'admin' || userRole === 'manager')) {
@@ -352,25 +364,38 @@ async function handleSaleSubmit(e) {
             // Item doesn't exist - confirm creation
             const confirmCreate = confirm(
                 `"${itemName}" is not in inventory yet.\n\n` +
-                `Add it to inventory with price ₦${unitPrice}?`
+                `Add it to inventory with price ₦${unitPrice}?\n` +
+                `Note: Initial stock will be 0. Remember to restock!`
             );
             
             if (confirmCreate) {
-                // Create new item
+                // Create new item with 0 quantity (will need restocking)
                 const newItem = {
                     name: itemName,
                     currentPrice: unitPrice,
+                    quantity: 0, // Start with 0 stock
+                    minStock: 10, // Default minimum stock
                     category: '',
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
                     createdBy: currentUser.uid,
                     lastUpdatedBy: currentUser.uid,
-                    isActive: true
+                    isActive: true,
+                    stockHistory: [{
+                        type: 'initial',
+                        quantity: 0,
+                        date: serverTimestamp(),
+                        recordedBy: currentUser.uid,
+                        notes: 'Item created during sale - needs restocking'
+                    }]
                 };
                 
                 const itemRef = await addDoc(collection(db, 'items'), newItem);
                 itemId = itemRef.id;
-                itemAction = ' (new item added to inventory)';
+                itemAction = ' (new item added to inventory - NEEDS RESTOCKING)';
+                
+                // Show stock alert
+                showStockAlert(itemName, 0, 'critical');
             } else {
                 return; // User cancelled - don't record the sale
             }
@@ -397,6 +422,11 @@ async function handleSaleSubmit(e) {
         
         await addDoc(collection(db, 'sales'), saleData);
         
+        // *** CRITICAL: UPDATE INVENTORY AFTER SALE ***
+        if (itemId) {
+            await updateInventoryAfterSale(itemId, quantity);
+        }
+        
         // If credit sale, update credits collection
         if (selectedPaymentMethod === 'credit') {
             await updateCreditsForCustomer(customerName, totalAmount);
@@ -404,7 +434,7 @@ async function handleSaleSubmit(e) {
         
         // Log user activity
         await logActivity('sale_recorded', 
-            `Recorded sale: ${quantity}x ${itemName} for ₦${totalAmount}`);
+            `Recorded sale: ${quantity}x ${itemName} for ₦${totalAmount}${itemAction}`);
         
         // Reset form
         saleForm.reset();
@@ -416,7 +446,7 @@ async function handleSaleSubmit(e) {
         totalAmountSpan.textContent = '0';
         
         // Show success message
-        alert('Sale recorded successfully!');
+        alert(`Sale recorded successfully!${itemAction}`);
         
         // Refresh dashboard if on dashboard page
         const dashboardPage = document.getElementById('page-dashboard');
@@ -1149,9 +1179,11 @@ async function loadInventoryData() {
     }
 }
 
-// Generate HTML for inventory item
+// Generate HTML for inventory item with quantity
 function generateInventoryItemHTML(item) {
     const lastUpdated = item.updatedAt ? formatDate(item.updatedAt) : 'Never';
+    const quantity = item.quantity || 0;
+    const stockStatus = getStockStatus(quantity);
     
     return `
         <div class="inventory-item" data-item-id="${item.id}" data-item-name="${item.name.toLowerCase()}">
@@ -1159,11 +1191,21 @@ function generateInventoryItemHTML(item) {
                 <h5>${item.name}</h5>
                 <div class="item-price">₦${item.currentPrice.toLocaleString()}</div>
             </div>
+            <div class="item-stock-info">
+                <div class="stock-quantity ${stockStatus.class}">
+                    <span class="stock-label">Stock:</span>
+                    <span class="stock-value">${quantity}</span>
+                </div>
+                <span class="stock-status">${stockStatus.text}</span>
+            </div>
             <div class="item-meta">
                 <span class="meta-item">Last updated: ${lastUpdated}</span>
                 ${item.category ? `<span class="category-badge">${item.category}</span>` : ''}
             </div>
             <div class="item-actions">
+                <button class="btn-icon btn-restock" data-item-id="${item.id}" title="Add stock">
+                    📦
+                </button>
                 <button class="btn-icon btn-edit" data-item-id="${item.id}" title="Edit item">
                     ✏️
                 </button>
@@ -1173,6 +1215,17 @@ function generateInventoryItemHTML(item) {
             </div>
         </div>
     `;
+}
+
+// Get stock status based on quantity
+function getStockStatus(quantity) {
+    if (quantity <= 0) {
+        return { class: 'out-of-stock', text: 'Out of Stock' };
+    } else if (quantity <= 10) {
+        return { class: 'low-stock', text: 'Low Stock' };
+    } else {
+        return { class: 'in-stock', text: 'In Stock' };
+    }
 }
 
 // Setup inventory search
@@ -1226,6 +1279,14 @@ function setupInventorySearch() {
 
 // Setup inventory item listeners
 function setupInventoryItemListeners() {
+    // Restock buttons
+    document.querySelectorAll('.btn-restock').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const itemId = e.target.dataset.itemId;
+            await showRestockModal(itemId);
+        });
+    });
+    
     // Edit buttons
     document.querySelectorAll('.btn-edit').forEach(btn => {
         btn.addEventListener('click', async (e) => {
@@ -1253,9 +1314,15 @@ function showAddItemModal() {
                     <label for="new-item-name">Item Name *</label>
                     <input type="text" id="new-item-name" required placeholder="e.g., Coca Cola 50cl">
                 </div>
-                <div class="form-group">
-                    <label for="new-item-price">Price (₦) *</label>
-                    <input type="number" id="new-item-price" min="0" step="1" required placeholder="e.g., 200">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="new-item-price">Price (₦) *</label>
+                        <input type="number" id="new-item-price" min="0" step="1" required placeholder="e.g., 200">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-item-quantity">Initial Quantity *</label>
+                        <input type="number" id="new-item-quantity" min="0" step="1" required placeholder="e.g., 50">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="new-item-category">Category (Optional)</label>
@@ -1270,6 +1337,11 @@ function showAddItemModal() {
                         <option value="Food">
                         <option value="Cosmetics">
                     </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="new-item-min-stock">Minimum Stock Level (Optional)</label>
+                    <input type="number" id="new-item-min-stock" min="0" step="1" placeholder="e.g., 10">
+                    <small>Alert when stock falls below this level</small>
                 </div>
             </form>
         `,
@@ -1290,14 +1362,14 @@ function showAddItemModal() {
 
 // Handle add item
 async function handleAddItem() {
-
-    const currentUser = getCurrentUser(); // Get current user
-    const userRole = getUserRole(); // Get user role
-
+    const currentUser = getCurrentUser();
+    const userRole = getUserRole();
 
     const name = document.getElementById('new-item-name').value.trim();
     const price = parseFloat(document.getElementById('new-item-price').value);
+    const quantity = parseInt(document.getElementById('new-item-quantity').value) || 0;
     const category = document.getElementById('new-item-category').value.trim();
+    const minStock = parseInt(document.getElementById('new-item-min-stock').value) || 10;
     
     if (!name) {
         alert('Please enter an item name');
@@ -1306,6 +1378,11 @@ async function handleAddItem() {
     
     if (!price || price < 0) {
         alert('Please enter a valid price');
+        return;
+    }
+    
+    if (quantity < 0) {
+        alert('Please enter a valid quantity');
         return;
     }
     
@@ -1324,22 +1401,31 @@ async function handleAddItem() {
             return;
         }
         
-        // Add new item
+        // Add new item with quantity
         const newItem = {
             name: name,
             currentPrice: price,
+            quantity: quantity,
+            minStock: minStock,
             category: category,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             createdBy: currentUser.uid,
             lastUpdatedBy: currentUser.uid,
-            isActive: true
+            isActive: true,
+            stockHistory: [{
+                type: 'initial',
+                quantity: quantity,
+                date: serverTimestamp(),
+                recordedBy: currentUser.uid,
+                notes: 'Initial stock'
+            }]
         };
         
         await addDoc(collection(db, 'items'), newItem);
         
         // Log activity
-        await logActivity('item_added', `Added new item: ${name} at ₦${price}`);
+        await logActivity('item_added', `Added new item: ${name} with quantity ${quantity} at ₦${price}`);
         
         hideModal();
         alert('Item added successfully!');
@@ -1351,6 +1437,225 @@ async function handleAddItem() {
         console.error('Error adding item:', error);
         alert('Error adding item. Please try again.');
     }
+}
+
+// Show restock modal
+async function showRestockModal(itemId) {
+    try {
+        const itemDoc = await getDoc(doc(db, 'items', itemId));
+        if (!itemDoc.exists()) {
+            alert('Item not found');
+            return;
+        }
+        
+        const item = itemDoc.data();
+        const currentQuantity = item.quantity || 0;
+        
+        showModal({
+            title: `Restock: ${item.name}`,
+            content: `
+                <div class="restock-info">
+                    <p><strong>Current Stock:</strong> ${currentQuantity} units</p>
+                    <p><strong>Current Price:</strong> ₦${item.currentPrice}</p>
+                </div>
+                <form id="restock-form">
+                    <div class="form-group">
+                        <label for="restock-quantity">Quantity to Add *</label>
+                        <input type="number" id="restock-quantity" min="1" step="1" required placeholder="e.g., 20">
+                    </div>
+                    <div class="form-group">
+                        <label for="restock-cost">Cost per Unit (₦) (Optional)</label>
+                        <input type="number" id="restock-cost" min="0" step="0.01" placeholder="Purchase cost per unit">
+                        <small>For tracking profit margins</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="restock-supplier">Supplier (Optional)</label>
+                        <input type="text" id="restock-supplier" placeholder="e.g., Main Distributor">
+                    </div>
+                    <div class="form-group">
+                        <label for="restock-notes">Notes (Optional)</label>
+                        <textarea id="restock-notes" rows="2" placeholder="Any additional notes"></textarea>
+                    </div>
+                </form>
+            `,
+            actions: [
+                {
+                    text: 'Add Stock',
+                    class: 'btn-primary',
+                    onClick: () => handleRestock(itemId, currentQuantity)
+                },
+                {
+                    text: 'Cancel',
+                    class: 'btn-secondary',
+                    onClick: hideModal
+                }
+            ]
+        });
+        
+    } catch (error) {
+        console.error('Error loading item for restock:', error);
+        alert('Error loading item details');
+    }
+}
+
+// Handle restock
+async function handleRestock(itemId, currentQuantity) {
+    const currentUser = getCurrentUser();
+    const quantity = parseInt(document.getElementById('restock-quantity').value);
+    const cost = parseFloat(document.getElementById('restock-cost').value) || null;
+    const supplier = document.getElementById('restock-supplier').value.trim();
+    const notes = document.getElementById('restock-notes').value.trim();
+    
+    if (!quantity || quantity < 1) {
+        alert('Please enter a valid quantity');
+        return;
+    }
+    
+    try {
+        const newQuantity = currentQuantity + quantity;
+        
+        // Get current item data
+        const itemDoc = await getDoc(doc(db, 'items', itemId));
+        const itemData = itemDoc.data();
+        
+        // Prepare stock history entry
+        const stockEntry = {
+            type: 'restock',
+            quantity: quantity,
+            newTotal: newQuantity,
+            date: serverTimestamp(),
+            recordedBy: currentUser.uid,
+            cost: cost,
+            supplier: supplier,
+            notes: notes
+        };
+        
+        // Update item with new quantity
+        await updateDoc(doc(db, 'items', itemId), {
+            quantity: newQuantity,
+            updatedAt: serverTimestamp(),
+            lastUpdatedBy: currentUser.uid,
+            stockHistory: [...(itemData.stockHistory || []), stockEntry]
+        });
+        
+        // Log activity
+        await logActivity('item_restocked', 
+            `Restocked ${itemData.name}: +${quantity} units (new total: ${newQuantity})`);
+        
+        hideModal();
+        alert(`Successfully added ${quantity} units. New stock: ${newQuantity}`);
+        
+        // Reload inventory
+        loadInventoryData();
+        
+    } catch (error) {
+        console.error('Error restocking item:', error);
+        alert('Error updating stock. Please try again.');
+    }
+}
+
+// Update inventory after sale
+async function updateInventoryAfterSale(itemId, quantitySold) {
+    try {
+        const itemDoc = await getDoc(doc(db, 'items', itemId));
+        if (!itemDoc.exists()) {
+            console.warn('Item not found for inventory update');
+            return;
+        }
+        
+        const itemData = itemDoc.data();
+        const currentQuantity = itemData.quantity || 0;
+        const newQuantity = Math.max(0, currentQuantity - quantitySold);
+        
+        // Update item quantity
+        await updateDoc(doc(db, 'items', itemId), {
+            quantity: newQuantity,
+            updatedAt: serverTimestamp(),
+            lastUpdatedBy: getCurrentUser().uid,
+            stockHistory: [...(itemData.stockHistory || []), {
+                type: 'sale',
+                quantity: -quantitySold,
+                previousTotal: currentQuantity,
+                newTotal: newQuantity,
+                date: serverTimestamp(),
+                recordedBy: getCurrentUser().uid
+            }]
+        });
+        
+        // Check if low stock alert needed
+        const minStock = itemData.minStock || 10;
+        if (newQuantity === 0) {
+            console.warn(`🚨 Out of stock: ${itemData.name}`);
+            showStockAlert(itemData.name, newQuantity, 'critical');
+        } else if (newQuantity <= minStock) {
+            console.warn(`⚠️ Low stock alert: ${itemData.name} has only ${newQuantity} units left`);
+            showStockAlert(itemData.name, newQuantity, 'warning');
+        }
+        
+        // Refresh inventory if on inventory page
+        const inventoryPage = document.getElementById('page-inventory');
+        if (inventoryPage && inventoryPage.classList.contains('active')) {
+            loadInventoryData();
+        }
+        
+        console.log(`✅ Inventory updated: ${itemData.name} - Stock reduced from ${currentQuantity} to ${newQuantity}`);
+        
+    } catch (error) {
+        console.error('Error updating inventory after sale:', error);
+        // Don't block the sale, but log the error
+        alert('⚠️ Warning: Sale recorded but inventory update failed. Please check inventory manually.');
+    }
+}
+
+// Show stock alert notification
+function showStockAlert(itemName, quantity, type) {
+    // Remove any existing alerts
+    const existingAlert = document.querySelector('.stock-alert');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `stock-alert ${type}`;
+    alertDiv.innerHTML = `
+        <span class="stock-alert-icon">${type === 'critical' ? '🚨' : '⚠️'}</span>
+        <div class="stock-alert-message">
+            <div class="stock-alert-title">
+                ${type === 'critical' ? 'Out of Stock!' : 'Low Stock Warning'}
+            </div>
+            <div class="stock-alert-text">
+                ${itemName} - ${quantity > 0 ? `Only ${quantity} units remaining` : 'No stock available'}
+            </div>
+        </div>
+        <button class="stock-alert-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
+    // Style the close button
+    const style = document.createElement('style');
+    style.textContent = `
+        .stock-alert-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            margin-left: 1rem;
+        }
+        .stock-alert-close:hover {
+            color: #333;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(alertDiv);
+    
+    // Auto-remove after 8 seconds
+    setTimeout(() => {
+        if (alertDiv.parentElement) {
+            alertDiv.remove();
+        }
+    }, 8000);
 }
 
 // Show edit item modal

@@ -1771,6 +1771,209 @@ body.role-manager .action-btn.manager-only {
     }
 }
 
+/* ==================== INVENTORY QUANTITY STYLES ==================== */
+
+/* Stock information display */
+.item-stock-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 120px;
+}
+
+.stock-quantity {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.stock-label {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: normal;
+}
+
+.stock-value {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    min-width: 50px;
+    text-align: center;
+}
+
+/* Stock status colors */
+.stock-quantity.in-stock .stock-value {
+    background: #e8f5e8;
+    color: #388e3c;
+}
+
+.stock-quantity.low-stock .stock-value {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.stock-quantity.out-of-stock .stock-value {
+    background: #ffebee;
+    color: #d32f2f;
+}
+
+.stock-status {
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.in-stock .stock-status {
+    color: #388e3c;
+}
+
+.low-stock .stock-status {
+    color: #f57c00;
+}
+
+.out-of-stock .stock-status {
+    color: #d32f2f;
+}
+
+/* Restock button styling */
+.btn-icon.btn-restock {
+    background: #e8f5e8;
+    border-color: #4caf50;
+}
+
+.btn-icon.btn-restock:hover {
+    background: #4caf50;
+    border-color: #45a049;
+    transform: scale(1.1);
+}
+
+/* Restock modal info */
+.restock-info {
+    background: #f8f9ff;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.restock-info p {
+    margin: 0.5rem 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Inventory stats enhancement */
+.inventory-stats {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.stat-badge {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.stat-badge.warning {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.stat-badge.critical {
+    background: #ffebee;
+    color: #d32f2f;
+}
+
+/* Low stock warning in inventory list */
+.inventory-item.low-stock {
+    border-left: 4px solid #f57c00;
+}
+
+.inventory-item.out-of-stock {
+    border-left: 4px solid #d32f2f;
+    opacity: 0.8;
+}
+
+/* Stock alert notification */
+.stock-alert {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: white;
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 1000;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.stock-alert.warning {
+    border-left: 4px solid #f57c00;
+}
+
+.stock-alert.critical {
+    border-left: 4px solid #d32f2f;
+}
+
+.stock-alert-icon {
+    font-size: 1.5rem;
+}
+
+.stock-alert-message {
+    flex: 1;
+}
+
+.stock-alert-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.stock-alert-text {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .item-stock-info {
+        min-width: auto;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding: 0.5rem 0;
+        border-top: 1px solid #f1f3f4;
+        margin-top: 0.5rem;
+    }
+    
+    .stock-alert {
+        left: 10px;
+        right: 10px;
+        top: auto;
+        bottom: 20px;
+    }
+}
+
 /* ==================== CUSTOM SCROLLBAR STYLES ==================== */
 /* For Webkit browsers (Chrome, Safari, Edge) */
 * {
